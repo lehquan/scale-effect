@@ -1,0 +1,10 @@
+build
+node_modules
+.idea
+.DS_store
+.gitconfig
+.env
+.env.develop
+.env.production
+package-lock.json
+sources
