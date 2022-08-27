@@ -1,7 +1,9 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader';
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
 
 class App {
   constructor() {
@@ -32,23 +34,21 @@ class App {
     this.renderer.setSize(this.WIDTH, this.HEIGHT);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE.LinearToneMapping
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1
+    this.renderer.outputEncoding = THREE.sRGBEncoding;
     container.appendChild(this.renderer.domElement);
 
     // scene
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xd0d0d0)
     // this.scene.fog = new THREE.Fog('#d0d0d0', 100, 600)
-
-    // Fixed cube
-    const cubeGeometry = new THREE.BoxGeometry( 1, 1, 1);
-    const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000, transparent: true, opacity: 1 });
-    const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-    cube.scale.set(1, 1, 1)
-    cube.castShadow = true;
-    cube.position.set(0, 0, 0)
-    // this.scene.add(cube);
+    
+    // envMap
+    new RGBELoader().load('assets/texture/royal_esplanade_1k.pic', texture => {
+      texture.mapping = THREE.EquirectangularReflectionMapping
+      this.scene.environment = texture
+    })
 
     // load model
     const dracoLoader = new DRACOLoader()
