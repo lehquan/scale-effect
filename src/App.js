@@ -9,13 +9,40 @@ class App {
   constructor() {
     this.WIDTH = window.innerWidth/1.5
     this.HEIGHT = window.innerHeight/1.5
+    this.loader = new GLTFLoader()
+    this.params = {
+      Models: 'Helmet'
+    };
+    this.modelOptions = {
+      Drone: 'assets/drone.glb',
+      Fish: 'assets/fish.glb',
+      Flamingo: 'assets/Flamingo.glb',
+      Helmet: 'assets/helmet.glb',
+      Pikachu: 'assets/Pokemon_pickachu.glb',
+    };
+    
+    this.initScene()
   }
 
-  init = () => {
-    const container = document.createElement("div");
-    container.classList.add('container')
-    document.body.appendChild(container);
-
+  //
+  build = async () => {
+  
+    // load model
+    const dracoLoader = new DRACOLoader()
+    dracoLoader.setDecoderPath('vendor/draco/gltf/')
+    dracoLoader.preload()
+    this.loader.setDRACOLoader(dracoLoader)
+    await this.loadModel(this.modelOptions.Helmet)
+    
+    // ui
+    this.createGUI()
+  
+    window.addEventListener("resize", this.#onWindowResize);
+    this.#animate()
+  };
+  
+  // Initialize Scene and Environment
+  initScene = () => {
     // camera
     this.camera = new THREE.PerspectiveCamera(
         45,
@@ -23,12 +50,17 @@ class App {
         0.1,
         1e27
     );
-    this.camera.position.set(0, 3, 10)
-
+    this.camera.position.set(0, 0, 5)
+  
+    // scene
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0xd0d0d0)
+    
     // renderer
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
-    });
+    const container = document.createElement("div");
+    container.classList.add('container')
+    document.body.appendChild(container);
+    this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setClearColor(0xaaaaaa, 0); // Alpha color setting.
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(this.WIDTH, this.HEIGHT);
@@ -38,127 +70,135 @@ class App {
     this.renderer.toneMappingExposure = 1
     this.renderer.outputEncoding = THREE.sRGBEncoding;
     container.appendChild(this.renderer.domElement);
-
-    // scene
-    this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xd0d0d0)
-    // this.scene.fog = new THREE.Fog('#d0d0d0', 100, 600)
-    
+  
     // envMap
     new RGBELoader().load('assets/texture/royal_esplanade_1k.pic', texture => {
       texture.mapping = THREE.EquirectangularReflectionMapping
       this.scene.environment = texture
     })
-
-    // load model
-    const dracoLoader = new DRACOLoader()
-    dracoLoader.setDecoderPath('vendor/draco/gltf/')
-    dracoLoader.preload()
-
-    const loader = new GLTFLoader()
-    loader.setDRACOLoader(dracoLoader)
-    loader.load('assets/helmet.glb', gltf => {
-
-      // for shadow
-      gltf.scene.traverse(child => {
-        child.isMesh && (child.receiveShadow = child.castShadow = true);
-        if (child.material) {
-          child.material.side = THREE.DoubleSide
-          child.material.depthTest = true
-          child.material.depthWrite = true
-          child.material.needsUpdate = true
-        }
-      })
-
-      const bounds = new THREE.Box3().setFromObject( gltf.scene );
-      const center = new THREE.Vector3();
-      const sz = new THREE.Vector3();
-      bounds.getSize(sz);
-      bounds.getCenter( center );
-      gltf.scene.position.sub( center ); // center the model
-      this.scene.add( gltf.scene );
-      this.fitCameraToObject(gltf.scene)
-    })
-
+  
     // lights
-    const ambientLight = new THREE.AmbientLight(0x999999)
-    const dir1 = new THREE.DirectionalLight(0xffffff, 1)
-    dir1.position.set(1.5, 1.2, 0)
-    dir1.castShadow = true
-    this.scene.add(ambientLight, dir1)
-    // const cameraHelper = new THREE.CameraHelper(dir1.shadow.camera);
+    const dir = new THREE.DirectionalLight(0xffffff, 1)
+    dir.position.set(1.5, 1.2, 0)
+    dir.castShadow = true
+    this.scene.add( dir)
+    // const cameraHelper = new THREE.CameraHelper(dir.shadow.camera);
     // this.scene.add(cameraHelper);
-
+  
     // ground
     const planeGeometry = new THREE.PlaneGeometry(1, 1);
-    const planeMaterial = new THREE.MeshLambertMaterial({color: 0xcccccc});
+    const planeMaterial = new THREE.MeshLambertMaterial({color: 0xcccccc, transparent: true, opacity: 0.2});
     const ground = new THREE.Mesh(planeGeometry, planeMaterial);
     ground.receiveShadow = true;
-    ground.rotation.x = -0.5*Math.PI; // -90º
+    ground.rotation.x = -0.5 * Math.PI; // -90º
     ground.scale.setScalar(50)
-    ground.position.set(0, -1.5, 0)
+    ground.position.set(0, -1, 0)
     this.scene.add(ground);
-
+  
     // controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    // controls.addEventListener("change", this.#render);
-    // controls.minDistance = 0.02;
-    // controls.maxDistance = 10;
+    this.controls.enableZoom = false
     this.controls.target.set(0, 0, -0.2);
     this.controls.update();
-
-    window.addEventListener("resize", this.#onWindowResize);
-    this.#animate()
-  };
-
-  fitCameraToObject( object ) {
-
-    const offset = 1.5
-    const boundingBox = new THREE.Box3();
-    boundingBox.setFromObject(object);
-
-    const center = boundingBox.getCenter(new THREE.Vector3());
-    const size = boundingBox.getSize(new THREE.Vector3());
-
-    const startDistance = center.distanceTo(this.camera.position);
-    // here we must check if the screen is horizontal or vertical, because camera.fov is
-    // based on the vertical direction.
-    const endDistance = this.camera.aspect > 1 ?
-        ((size.y / 2) + offset) / Math.abs(Math.tan(this.camera.fov / 2)) :
-        ((size.y / 2) + offset) / Math.abs(Math.tan(this.camera.fov / 2)) /
-        this.camera.aspect;
-
-    this.camera.position.set(
-        this.camera.position.x * endDistance / startDistance,
-        this.camera.position.y * endDistance / startDistance,
-        this.camera.position.z * endDistance / startDistance,
-    );
-    this.camera.lookAt(center);
   }
-
-  #updateCenter = ( mesh ) => {
-    let bounds = new THREE.Box3();
-    mesh.updateMatrixWorld(true);
-    bounds.setFromObject(mesh)
-    let sz = new THREE.Vector3();
-    let center = new THREE.Vector3();
-    bounds.getSize(sz);
-    bounds.getCenter(center);
-
-    let smax = Math.max(sz.x, Math.max(sz.y, sz.z));
-    if(smax < 100 ) {
-      mesh.scale.multiplyScalar(2 / smax);
-    } else {
-      console.warn("Model is very large. Scale to 2 meters?")
+  
+  //
+  createGUI = () => {
+    const gui = new GUI();
+    
+    gui.add( this.params, 'Models', Object.keys( this.modelOptions ) )
+    .onChange(  async ev => {
+      await this.loadModel(this.modelOptions[ev])
+    });
+  
+    gui.open()
+  }
+  
+  /**
+   * Load gltf model by {url}
+   * @param url
+   */
+  loadModel = (url) => {
+    const found = this.scene.children.find(child => child.type === 'Model')
+    if (found) this.scene.remove(found)
+    
+    return new Promise(resolve => {
+      this.loader.load(url, gltf => {
+    
+        // for shadow
+        gltf.scene.traverse(child => {
+          child.isMesh && (child.receiveShadow = child.castShadow = true);
+          if (child.material) {
+            child.material.side = THREE.DoubleSide
+            child.material.depthTest = true
+            child.material.depthWrite = true
+            child.material.needsUpdate = true
+          }
+        })
+        gltf.scene.type = 'Model'
+        
+        // Fit camera into model right after model is loaded
+        this.#fitCameraToObject( gltf.scene )
+  
+        gltf.scene.add( new THREE.AxesHelper() )
+        this.scene.add( gltf.scene );
+        
+        resolve(gltf.scene)
+      })
+    })
+  }
+  
+  /**
+   * Fit camera viewport into object
+   * Discussion: https://discourse.threejs.org/t/camera-zoom-to-fit-object/936/25
+   * @param object
+   * @param fitOffset
+   */
+  #fitCameraToObject = ( object, fitOffset = 1.2) => {
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    const box = new THREE.Box3();
+    
+    box.makeEmpty();
+    box.expandByObject(object);
+    
+    box.getSize(size);
+    box.getCenter(center );
+    
+    const maxSize = Math.max(size.x, size.y, size.z);
+    if (maxSize < .1 ) {
+      fitOffset = 100
     }
-    // if ((smax < 100) || console.warn("Model is very large. Scale to 2 meters?")) {
-    //   mesh.scale.multiplyScalar(2 / smax);
-    // }
+    else if (maxSize > 300) {
+      console.warn("Model is very large. Scale to 2 meters?")
+      fitOffset = fitOffset / 2
+    }
+    
+    const fitHeightDistance = maxSize / (2 * Math.atan(Math.PI * this.camera.fov / 360));
+    const fitWidthDistance = fitHeightDistance / this.camera.aspect;
+    const distance = fitOffset * Math.max(fitHeightDistance, fitWidthDistance);
+    
+    const direction = this.controls.target.clone()
+    .sub(this.camera.position)
+    .normalize()
+    .multiplyScalar(distance);
+  
+    this.controls.maxDistance = distance * 10;
+    this.controls.target.copy(center);
+  
+    this.camera.near = distance / 100;
+    this.camera.far = distance * 100;
+    this.camera.updateProjectionMatrix();
+  
+    this.camera.position.copy(this.controls.target).sub(direction);
+  
+    this.controls.update();
   }
 
   #onWindowResize = () => {
     this.camera.aspect = this.WIDTH /this.HEIGHT;
     this.camera.updateProjectionMatrix();
+    
     this.renderer.setSize(this.WIDTH, this.HEIGHT);
   };
 
