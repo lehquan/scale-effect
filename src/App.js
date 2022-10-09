@@ -7,8 +7,10 @@ import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
 
 class App {
   constructor() {
-    this.WIDTH = window.innerWidth/1.5
-    this.HEIGHT = window.innerHeight/1.5
+    // this.WIDTH = window.innerWidth/1.5
+    // this.HEIGHT = window.innerHeight/1.5
+    this.WIDTH = window.innerWidth
+    this.HEIGHT = window.innerHeight
     this.loader = new GLTFLoader()
     this.params = {
       Models: 'Helmet'
@@ -18,7 +20,7 @@ class App {
       Fish: 'assets/fish.glb',
       Flamingo: 'assets/Flamingo.glb',
       Helmet: 'assets/helmet.glb',
-      Pikachu: 'assets/Pokemon_pickachu.glb',
+      // Pikachu: 'assets/Pokemon_pickachu.glb',
     };
     
     this.initScene()
@@ -54,7 +56,7 @@ class App {
   
     // scene
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xd0d0d0)
+    this.scene.background = new THREE.Color(0x112240)
     
     // renderer
     const container = document.createElement("div");
