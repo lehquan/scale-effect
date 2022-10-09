@@ -56,7 +56,7 @@ class App {
   
     // scene
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x112240)
+    this.scene.background = new THREE.Color(0x1e2243)
     
     // renderer
     const container = document.createElement("div");
